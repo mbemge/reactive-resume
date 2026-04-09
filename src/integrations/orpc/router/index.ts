@@ -3,6 +3,7 @@ import { authRouter } from "./auth";
 import { flagsRouter } from "./flags";
 import { jobsRouter } from "./jobs";
 import { printerRouter } from "./printer";
+import { psupRouter } from "./psup";
 import { resumeRouter } from "./resume";
 import { statisticsRouter } from "./statistics";
 import { storageRouter } from "./storage";
@@ -13,6 +14,7 @@ export default {
   flags: flagsRouter,
   jobs: jobsRouter,
   printer: printerRouter,
+  psup: psupRouter,
   resume: resumeRouter,
   statistics: statisticsRouter,
   storage: storageRouter,

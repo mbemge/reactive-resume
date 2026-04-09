@@ -2,6 +2,7 @@ import type { ResumeData } from "@/schema/resume/data";
 
 import type {
   PsupActiviteExtraScolaire,
+  PsupBulletin,
   PsupCandidat,
   PsupCompetence,
   PsupExperience,
@@ -136,6 +137,56 @@ function buildMotivationCustomSection(voeu: PsupVoeu, motivation?: string) {
   };
 }
 
+function buildBulletinsCustomSection(bulletins: PsupBulletin[], voeu?: PsupVoeu) {
+  if (bulletins.length === 0) return null;
+
+  // Group bulletins by year and class, pick most recent first
+  const sorted = [...bulletins].sort((a, b) => b.annee.localeCompare(a.annee));
+
+  // For each bulletin, build a summary item showing key grades
+  const items = sorted.map((bulletin) => {
+    const lines: string[] = [];
+
+    lines.push(
+      `<p><strong>${bulletin.classe} - ${bulletin.trimestre} (${bulletin.annee})</strong></p>`,
+    );
+
+    // Filter notes relevant to the voeu if possible
+    const relevantNotes = bulletin.notes.filter((n) => n.moyenne !== undefined);
+
+    if (relevantNotes.length > 0) {
+      lines.push("<ul>");
+      for (const note of relevantNotes) {
+        let line = `<li><strong>${note.matiere}</strong> : ${note.moyenne}/20`;
+        if (note.moyenneClasse) line += ` (classe : ${note.moyenneClasse}/20)`;
+        if (note.appreciation) line += ` - <em>${note.appreciation}</em>`;
+        line += "</li>";
+        lines.push(line);
+      }
+      lines.push("</ul>");
+    }
+
+    if (bulletin.appreciationGenerale) {
+      lines.push(`<p><em>${bulletin.appreciationGenerale}</em></p>`);
+    }
+
+    return {
+      id: generateId(),
+      hidden: false,
+      content: lines.join(""),
+    };
+  });
+
+  return {
+    id: generateId(),
+    type: "summary" as const,
+    title: "Resultats scolaires",
+    columns: 1,
+    hidden: false,
+    items,
+  };
+}
+
 function buildActivitesCustomSection(activites: PsupActiviteExtraScolaire[]) {
   if (activites.length === 0) return null;
 
@@ -189,6 +240,10 @@ export function mapPsupToResumeData(
     const motivSection = buildMotivationCustomSection(voeu, candidat.projetMotivation);
     if (motivSection) customSections.push(motivSection);
   }
+
+  // Section resultats scolaires (bulletins)
+  const bulletinsSection = buildBulletinsCustomSection(candidat.bulletins, voeu);
+  if (bulletinsSection) customSections.push(bulletinsSection);
 
   // Section activites extra-scolaires
   const activitesSection = buildActivitesCustomSection(candidat.activitesExtraScolaires);
@@ -314,4 +369,102 @@ export function mapPsupToResumeData(
       notes: "",
     },
   };
+}
+
+/**
+ * Fusionne les donnees parsees d'un CV existant (experiences, competences,
+ * projets, certifications) dans un ResumeData deja genere depuis PSUP.
+ *
+ * Les donnees PSUP (identite, formations, bulletins) restent prioritaires.
+ * Le CV parse apporte les sections manquantes dans PSUP :
+ * experiences, projets, certifications, summary enrichi.
+ */
+export function mergeParsedCvIntoResumeData(
+  psupResume: ResumeData,
+  parsedCv: ResumeData,
+): ResumeData {
+  const merged = { ...psupResume };
+
+  // Experiences : on prend celles du CV parse si PSUP n'en a pas
+  if (
+    psupResume.sections.experience.items.length === 0 &&
+    parsedCv.sections.experience.items.length > 0
+  ) {
+    merged.sections = {
+      ...merged.sections,
+      experience: {
+        ...merged.sections.experience,
+        hidden: false,
+        items: parsedCv.sections.experience.items,
+      },
+    };
+  }
+
+  // Projets : on prend ceux du CV parse
+  if (parsedCv.sections.projects.items.length > 0) {
+    merged.sections = {
+      ...merged.sections,
+      projects: {
+        ...merged.sections.projects,
+        hidden: false,
+        items: parsedCv.sections.projects.items,
+      },
+    };
+  }
+
+  // Certifications : on prend celles du CV parse
+  if (parsedCv.sections.certifications.items.length > 0) {
+    merged.sections = {
+      ...merged.sections,
+      certifications: {
+        ...merged.sections.certifications,
+        hidden: false,
+        items: parsedCv.sections.certifications.items,
+      },
+    };
+  }
+
+  // Competences : on complete avec celles du CV parse (pas de doublon)
+  if (parsedCv.sections.skills.items.length > 0) {
+    const existingNames = new Set(
+      psupResume.sections.skills.items.map((s) => s.name.toLowerCase()),
+    );
+    const newSkills = parsedCv.sections.skills.items.filter(
+      (s) => !existingNames.has(s.name.toLowerCase()),
+    );
+
+    if (newSkills.length > 0) {
+      merged.sections = {
+        ...merged.sections,
+        skills: {
+          ...merged.sections.skills,
+          hidden: false,
+          items: [...merged.sections.skills.items, ...newSkills],
+        },
+      };
+    }
+  }
+
+  // Benevolat : on prend celui du CV parse
+  if (parsedCv.sections.volunteer.items.length > 0) {
+    merged.sections = {
+      ...merged.sections,
+      volunteer: {
+        ...merged.sections.volunteer,
+        hidden: false,
+        items: parsedCv.sections.volunteer.items,
+      },
+    };
+  }
+
+  // Summary : si PSUP n'a pas de summary mais le CV parse en a un, on l'utilise
+  if (!psupResume.summary.content && parsedCv.summary.content) {
+    merged.summary = {
+      ...merged.summary,
+      hidden: false,
+      content: parsedCv.summary.content,
+    };
+  }
+
+  return merged;
 }

@@ -1,10 +1,12 @@
+import type { ResumeData } from "@/schema/resume/data";
+
 import type { PsupCandidat, PsupVoeu } from "./schema";
 
-import { resumeService } from "@/integrations/orpc/services/resume";
 import { printerService } from "@/integrations/orpc/services/printer";
+import { resumeService } from "@/integrations/orpc/services/resume";
 import { generateId } from "@/utils/string";
 
-import { mapPsupToResumeData } from "./mapper";
+import { mapPsupToResumeData, mergeParsedCvIntoResumeData } from "./mapper";
 
 export type BatchGenerateInput = {
   userId: string;
@@ -17,16 +19,23 @@ export type BatchGenerateInput = {
   concurrency?: number;
 };
 
-export type BatchGenerateResult = {
+export type GenerateResult = {
   candidatNom: string;
   resumeId: string;
+  editorUrl?: string;
   pdfUrl?: string;
   error?: string;
 };
 
 /**
- * Genere un CV unique pour un candidat Parcoursup.
- * Cree le resume en base et optionnellement genere le PDF.
+ * Genere un CV pour un candidat Parcoursup.
+ *
+ * Flow complet :
+ * 1. Convertit les donnees PSUP en ResumeData (identite, formations, bulletins, voeu)
+ * 2. Si un CV parse est fourni, fusionne les experiences/competences extraites
+ * 3. Cree le CV en base de donnees
+ * 4. Optionnellement genere le PDF
+ * 5. Retourne le resumeId + URL de l'editeur pour retouches manuelles
  */
 export async function generateSingleCV(input: {
   userId: string;
@@ -34,21 +43,28 @@ export async function generateSingleCV(input: {
   voeu?: PsupVoeu;
   template?: string;
   generatePdf?: boolean;
-}): Promise<BatchGenerateResult> {
-  const { userId, candidat, voeu, template, generatePdf } = input;
+  parsedCvData?: ResumeData;
+  appUrl?: string;
+}): Promise<GenerateResult> {
+  const { userId, candidat, voeu, template, generatePdf, parsedCvData, appUrl } = input;
   const nom = `${candidat.prenom} ${candidat.nom}`;
 
   try {
-    const resumeData = mapPsupToResumeData(candidat, voeu, template);
+    // Step 1: Map PSUP data to ResumeData
+    let resumeData = mapPsupToResumeData(candidat, voeu, template);
 
+    // Step 2: Merge parsed CV data (experiences, competences, projets) if provided
+    if (parsedCvData) {
+      resumeData = mergeParsedCvIntoResumeData(resumeData, parsedCvData);
+    }
+
+    // Step 3: Create resume in database
     const slug = `${candidat.prenom}-${candidat.nom}-${voeu?.id ?? "cv"}`
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, "-")
       .replace(/-+/g, "-");
 
-    const resumeName = voeu
-      ? `CV ${nom} - ${voeu.formation}`
-      : `CV ${nom}`;
+    const resumeName = voeu ? `CV ${nom} - ${voeu.formation}` : `CV ${nom}`;
 
     const resumeId = await resumeService.create({
       userId,
@@ -59,6 +75,7 @@ export async function generateSingleCV(input: {
       data: resumeData,
     });
 
+    // Step 4: Generate PDF if requested
     let pdfUrl: string | undefined;
 
     if (generatePdf) {
@@ -70,7 +87,10 @@ export async function generateSingleCV(input: {
       });
     }
 
-    return { candidatNom: nom, resumeId, pdfUrl };
+    // Step 5: Build editor URL for manual editing
+    const editorUrl = appUrl ? `${appUrl}/builder/${resumeId}` : undefined;
+
+    return { candidatNom: nom, resumeId, editorUrl, pdfUrl };
   } catch (error) {
     return {
       candidatNom: nom,
@@ -84,11 +104,10 @@ export async function generateSingleCV(input: {
  * Genere des CVs en batch pour plusieurs candidats.
  * Controle la concurrence pour ne pas surcharger Browserless.
  */
-export async function generateBatchCVs(input: BatchGenerateInput): Promise<BatchGenerateResult[]> {
+export async function generateBatchCVs(input: BatchGenerateInput): Promise<GenerateResult[]> {
   const { userId, candidats, template, generatePdf = false, concurrency = 3 } = input;
-  const results: BatchGenerateResult[] = [];
+  const results: GenerateResult[] = [];
 
-  // Process in chunks to control concurrency
   for (let i = 0; i < candidats.length; i += concurrency) {
     const chunk = candidats.slice(i, i + concurrency);
 

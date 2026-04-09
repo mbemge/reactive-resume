@@ -1,0 +1,149 @@
+# compose.coolify.yml
+# Deployment configuration for Coolify on Hetzner
+#
+# Usage in Coolify:
+#   1. Create a new "Docker Compose" resource
+#   2. Point it to your GitHub fork (mbemge/reactive-resume)
+#   3. Set branch to: claude/analyze-cv-generator-FR3xe
+#   4. Set compose file to: compose.coolify.yml
+#   5. Configure the environment variables in Coolify's UI
+#   6. Deploy
+#
+# Required environment variables to set in Coolify:
+#   APP_URL           → https://cv.yourdomain.com (your actual domain)
+#   AUTH_SECRET       → Generate with: openssl rand -hex 32
+#   POSTGRES_PASSWORD → Strong random password
+#
+# Optional environment variables:
+#   S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT, S3_BUCKET
+#     → If you want external S3 storage (Cloudflare R2, MinIO, etc.)
+#     → If not set, SeaweedFS is included below as local S3
+
+name: reactive_resume
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: reactive_resume
+      POSTGRES_USER: reactive_resume
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-coolify}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "reactive_resume", "-d", "reactive_resume"]
+      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    restart: unless-stopped
+    environment:
+      QUEUED: "20"
+      HEALTH: "true"
+      CONCURRENT: "10"
+      TOKEN: ${BROWSERLESS_TOKEN:-1234567890}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/pressure?token=${BROWSERLESS_TOKEN:-1234567890}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: server -s3 -filer -dir=/data -ip=0.0.0.0
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-seaweedfs}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-seaweedfs}
+    volumes:
+      - seaweedfs_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8888"]
+      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  seaweedfs_create_bucket:
+    image: quay.io/minio/mc:latest
+    restart: on-failure
+    entrypoint: >
+      /bin/sh -c "
+        sleep 5;
+        mc alias set seaweedfs http://seaweedfs:8333 ${S3_ACCESS_KEY_ID:-seaweedfs} ${S3_SECRET_ACCESS_KEY:-seaweedfs};
+        mc mb seaweedfs/reactive-resume --ignore-existing;
+        exit 0;
+      "
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Server
+      TZ: "Europe/Paris"
+      NODE_ENV: "production"
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      PRINTER_APP_URL: "http://app:3000"
+
+      # Printer (Browserless)
+      PRINTER_ENDPOINT: "ws://browserless:3000?token=${BROWSERLESS_TOKEN:-1234567890}"
+
+      # Database
+      DATABASE_URL: "postgresql://reactive_resume:${POSTGRES_PASSWORD:-change-me-in-coolify}@postgres:5432/reactive_resume"
+
+      # Authentication
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-coolify}
+
+      # Storage (SeaweedFS interne)
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-seaweedfs}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-seaweedfs}
+      S3_ENDPOINT: "http://seaweedfs:8333"
+      S3_BUCKET: "reactive-resume"
+      S3_FORCE_PATH_STYLE: "true"
+
+      # Optional: OAuth providers
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+
+      # Optional: Email (SMTP)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+
+      # Optional: Feature flags
+      FLAG_DISABLE_SIGNUPS: ${FLAG_DISABLE_SIGNUPS:-false}
+    volumes:
+      - app_data:/app/data
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      browserless:
+        condition: service_healthy
+      seaweedfs_create_bucket:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      start_period: 60s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  seaweedfs_data:
+  app_data:

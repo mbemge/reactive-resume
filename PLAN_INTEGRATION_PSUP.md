@@ -56,6 +56,7 @@
 ```
 
 **Pourquoi un proxy dans PSUP ?**
+
 - L'API key Reactive Resume reste cote serveur (jamais exposee au client)
 - Le frontend PSUP appelle `/api/cv/*` (meme domaine, pas de CORS)
 - Le proxy Vercel forward vers Hetzner avec le header `x-api-key`
@@ -72,11 +73,11 @@
   - Compose file : `compose.coolify.yml`
 - [ ] Variables d'environnement Coolify :
 
-  | Variable | Valeur |
-  |----------|--------|
-  | `APP_URL` | `https://cv.votredomaine.com` |
-  | `AUTH_SECRET` | `openssl rand -hex 32` |
-  | `POSTGRES_PASSWORD` | mot de passe fort |
+  | Variable            | Valeur                        |
+  | ------------------- | ----------------------------- |
+  | `APP_URL`           | `https://cv.votredomaine.com` |
+  | `AUTH_SECRET`       | `openssl rand -hex 32`        |
+  | `POSTGRES_PASSWORD` | mot de passe fort             |
 
 - [ ] Domaine + SSL (Coolify gere Let's Encrypt)
 - [ ] Deploy, attendre ~5 min
@@ -160,11 +161,7 @@ export async function generateBatch(input: {
   return rrFetch("/psup/generate-batch", input);
 }
 
-export async function previewCv(input: {
-  candidat: PsupCandidat;
-  voeu?: PsupVoeu;
-  parsedCvData?: ResumeData;
-}) {
+export async function previewCv(input: { candidat: PsupCandidat; voeu?: PsupVoeu; parsedCvData?: ResumeData }) {
   return rrFetch("/psup/preview", input);
 }
 ```
@@ -318,9 +315,9 @@ const onUpload = async (file: File) => {
   const parsed = await fetch("/api/cv/parse", {
     method: "POST",
     body: JSON.stringify({
-      file: { name: file.name, data: base64, type: file.type }
+      file: { name: file.name, data: base64, type: file.type },
     }),
-  }).then(r => r.json());
+  }).then((r) => r.json());
   setParsedCv(parsed);
   setLoading(false);
 };
@@ -337,9 +334,9 @@ const onGenerate = async (voeuId: string) => {
       generatePdf: true,
       parsedCvData: parsedCv,
     }),
-  }).then(r => r.json());
+  }).then((r) => r.json());
   // result = { resumeId, editorUrl, pdfUrl }
-  setCvList(prev => [...prev, result]);
+  setCvList((prev) => [...prev, result]);
   setGenerating(false);
 };
 
@@ -351,13 +348,13 @@ const onEdit = (editorUrl: string) => {
 
 ### 3.3 — Timings et UX
 
-| Action | Duree | UX |
-|--------|-------|----|
-| Parse CV (IA) | 10-20s | Spinner + "Analyse du CV en cours..." |
-| Generer CV (sans PDF) | 1-2s | Instantane |
-| Generer CV (avec PDF) | 5-15s | Barre de progression |
-| Ouvrir editeur | instantane | Nouvel onglet |
-| Batch 10 CVs + PDF | 30-60s | Progress "3/10 generes..." |
+| Action                | Duree      | UX                                    |
+| --------------------- | ---------- | ------------------------------------- |
+| Parse CV (IA)         | 10-20s     | Spinner + "Analyse du CV en cours..." |
+| Generer CV (sans PDF) | 1-2s       | Instantane                            |
+| Generer CV (avec PDF) | 5-15s      | Barre de progression                  |
+| Ouvrir editeur        | instantane | Nouvel onglet                         |
+| Batch 10 CVs + PDF    | 30-60s     | Progress "3/10 generes..."            |
 
 **Validation** : Flow complet upload → generer → voir PDF → editer fonctionne
 
@@ -366,15 +363,15 @@ const onEdit = (editorUrl: string) => {
 ## Phase 4 — Ameliorations (2-3 jours)
 
 - [ ] Tailoring IA : brancher le prompt `tailor-parcoursup-system.md`
-  pour adapter automatiquement le contenu aux attendus du voeu
+      pour adapter automatiquement le contenu aux attendus du voeu
 - [ ] Bouton "Generer pour tous les voeux" → appel batch
 - [ ] Cache du parsing : stocker `parsed_cv` en base PSUP
-  pour ne pas re-parser a chaque generation
+      pour ne pas re-parser a chaque generation
 - [ ] Nettoyage Reactive Resume :
-  virer job search, PWA, locales inutiles, reduire templates
+      virer job search, PWA, locales inutiles, reduire templates
 - [ ] Branding : remplacer le logo Reactive Resume par le logo PSUP
 - [ ] Auth transparente : SSO ou token pre-genere pour que
-  le conseiller accede a l'editeur sans se reconnecter
+      le conseiller accede a l'editeur sans se reconnecter
 
 ---
 
@@ -390,25 +387,25 @@ const onEdit = (editorUrl: string) => {
 
 ## Estimation
 
-| Phase | Duree | Ou |
-|-------|-------|----|
-| 1. Deploy Reactive Resume | 1-2j | Hetzner/Coolify |
-| 2. API routes PSUP | 2-3j | Vercel (PSUP) |
-| 3. Frontend onglet CV | 3-5j | Vercel (PSUP) |
-| 4. Ameliorations | 2-3j | Les deux |
-| 5. Production | 1-2j | Les deux |
-| **Total** | **9-15 jours** | |
+| Phase                     | Duree          | Ou              |
+| ------------------------- | -------------- | --------------- |
+| 1. Deploy Reactive Resume | 1-2j           | Hetzner/Coolify |
+| 2. API routes PSUP        | 2-3j           | Vercel (PSUP)   |
+| 3. Frontend onglet CV     | 3-5j           | Vercel (PSUP)   |
+| 4. Ameliorations          | 2-3j           | Les deux        |
+| 5. Production             | 1-2j           | Les deux        |
+| **Total**                 | **9-15 jours** |                 |
 
 ---
 
 ## Reference API
 
-| Methode | Endpoint (Reactive Resume) | Description |
-|---------|----------------------------|-------------|
-| POST | `/api/rpc/psup/parse-cv` | Parse CV (PDF/DOCX) via IA |
-| POST | `/api/rpc/psup/preview` | Apercu JSON sans sauvegarde |
-| POST | `/api/rpc/psup/generate` | Cree CV + retourne editorUrl + pdfUrl |
-| POST | `/api/rpc/psup/generate-batch` | Batch generation (max 100) |
-| GET | `/api/rpc/resumes/{id}/pdf` | Telecharge le PDF |
+| Methode | Endpoint (Reactive Resume)     | Description                           |
+| ------- | ------------------------------ | ------------------------------------- |
+| POST    | `/api/rpc/psup/parse-cv`       | Parse CV (PDF/DOCX) via IA            |
+| POST    | `/api/rpc/psup/preview`        | Apercu JSON sans sauvegarde           |
+| POST    | `/api/rpc/psup/generate`       | Cree CV + retourne editorUrl + pdfUrl |
+| POST    | `/api/rpc/psup/generate-batch` | Batch generation (max 100)            |
+| GET     | `/api/rpc/resumes/{id}/pdf`    | Telecharge le PDF                     |
 
 **Auth** : header `x-api-key: rxr_votre_api_key` sur toutes les requetes.

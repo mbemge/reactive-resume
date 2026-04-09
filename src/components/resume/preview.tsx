@@ -25,12 +25,15 @@ import { DitgarTemplate } from "./templates/ditgar";
 import { DittoTemplate } from "./templates/ditto";
 import { GengarTemplate } from "./templates/gengar";
 import { GlalieTemplate } from "./templates/glalie";
+import { HaussmannTemplate } from "./templates/haussmann";
 import { KakunaTemplate } from "./templates/kakuna";
 import { LaprasTemplate } from "./templates/lapras";
 import { LeafishTemplate } from "./templates/leafish";
+import { MaraisTemplate } from "./templates/marais";
 import { OnyxTemplate } from "./templates/onyx";
 import { PikachuTemplate } from "./templates/pikachu";
 import { RhyhornTemplate } from "./templates/rhyhorn";
+import { RivoliTemplate } from "./templates/rivoli";
 import { SorbonneTemplate } from "./templates/sorbonne";
 
 export type ExtendedIconProps = IconProps & {
@@ -49,12 +52,15 @@ function getTemplateComponent(template: Template) {
     .with("ditgar", () => DitgarTemplate)
     .with("gengar", () => GengarTemplate)
     .with("glalie", () => GlalieTemplate)
+    .with("haussmann", () => HaussmannTemplate)
     .with("kakuna", () => KakunaTemplate)
     .with("lapras", () => LaprasTemplate)
     .with("leafish", () => LeafishTemplate)
+    .with("marais", () => MaraisTemplate)
     .with("onyx", () => OnyxTemplate)
     .with("pikachu", () => PikachuTemplate)
     .with("rhyhorn", () => RhyhornTemplate)
+    .with("rivoli", () => RivoliTemplate)
     .with("sorbonne", () => SorbonneTemplate)
     .exhaustive();
 }

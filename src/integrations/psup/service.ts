@@ -1,10 +1,10 @@
 import type { ResumeData } from "@/schema/resume/data";
 
-import type { PsupCandidat, PsupVoeu } from "./schema";
-
 import { printerService } from "@/integrations/orpc/services/printer";
 import { resumeService } from "@/integrations/orpc/services/resume";
 import { generateId } from "@/utils/string";
+
+import type { PsupCandidat, PsupVoeu } from "./schema";
 
 import { mapPsupToResumeData, mergeParsedCvIntoResumeData } from "./mapper";
 
@@ -112,9 +112,7 @@ export async function generateBatchCVs(input: BatchGenerateInput): Promise<Gener
     const chunk = candidats.slice(i, i + concurrency);
 
     const chunkResults = await Promise.all(
-      chunk.map(({ candidat, voeu }) =>
-        generateSingleCV({ userId, candidat, voeu, template, generatePdf }),
-      ),
+      chunk.map(({ candidat, voeu }) => generateSingleCV({ userId, candidat, voeu, template, generatePdf })),
     );
 
     results.push(...chunkResults);

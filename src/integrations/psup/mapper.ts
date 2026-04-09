@@ -1,5 +1,8 @@
 import type { ResumeData } from "@/schema/resume/data";
 
+import { defaultResumeData } from "@/schema/resume/data";
+import { generateId } from "@/utils/string";
+
 import type {
   PsupActiviteExtraScolaire,
   PsupBulletin,
@@ -10,9 +13,6 @@ import type {
   PsupLangue,
   PsupVoeu,
 } from "./schema";
-
-import { defaultResumeData } from "@/schema/resume/data";
-import { generateId } from "@/utils/string";
 
 const NIVEAU_MAP: Record<string, { fluency: string; level: number }> = {
   natif: { fluency: "Langue maternelle", level: 5 },
@@ -76,8 +76,7 @@ function mapExperience(exp: PsupExperience) {
 
 function mapLangue(langue: PsupLangue) {
   const mapped = NIVEAU_MAP[langue.niveau] ?? { fluency: langue.niveau, level: 2 };
-  const certInfo =
-    langue.certifications.length > 0 ? ` (${langue.certifications.join(", ")})` : "";
+  const certInfo = langue.certifications.length > 0 ? ` (${langue.certifications.join(", ")})` : "";
 
   return {
     id: generateId(),
@@ -137,7 +136,7 @@ function buildMotivationCustomSection(voeu: PsupVoeu, motivation?: string) {
   };
 }
 
-function buildBulletinsCustomSection(bulletins: PsupBulletin[], voeu?: PsupVoeu) {
+function buildBulletinsCustomSection(bulletins: PsupBulletin[], _voeu?: PsupVoeu) {
   if (bulletins.length === 0) return null;
 
   // Group bulletins by year and class, pick most recent first
@@ -147,12 +146,13 @@ function buildBulletinsCustomSection(bulletins: PsupBulletin[], voeu?: PsupVoeu)
   const items = sorted.map((bulletin) => {
     const lines: string[] = [];
 
-    lines.push(
-      `<p><strong>${bulletin.classe} - ${bulletin.trimestre} (${bulletin.annee})</strong></p>`,
-    );
+    lines.push(`<p><strong>${bulletin.classe} - ${bulletin.trimestre} (${bulletin.annee})</strong></p>`);
 
     // Filter notes relevant to the voeu if possible
-    const relevantNotes = bulletin.notes.filter((n) => n.moyenne !== undefined);
+    const relevantNotes = bulletin.notes.filter(
+      (n: { moyenne?: number; moyenneClasse?: number; matiere: string; appreciation?: string }) =>
+        n.moyenne !== undefined,
+    );
 
     if (relevantNotes.length > 0) {
       lines.push("<ul>");
@@ -218,11 +218,7 @@ function buildActivitesCustomSection(activites: PsupActiviteExtraScolaire[]) {
  * @param voeu - Voeu specifique pour lequel adapter le CV (optionnel)
  * @param template - Template a utiliser (defaut: "sorbonne")
  */
-export function mapPsupToResumeData(
-  candidat: PsupCandidat,
-  voeu?: PsupVoeu,
-  template?: string,
-): ResumeData {
+export function mapPsupToResumeData(candidat: PsupCandidat, voeu?: PsupVoeu, template?: string): ResumeData {
   const location = candidat.adresse
     ? `${candidat.adresse.ville}${candidat.adresse.codePostal ? ` (${candidat.adresse.codePostal})` : ""}`
     : "";
@@ -326,12 +322,7 @@ export function mapPsupToResumeData(
         pages: [
           {
             fullWidth: false,
-            main: [
-              "summary",
-              "education",
-              "experience",
-              ...customSectionIds,
-            ],
+            main: ["summary", "education", "experience", ...customSectionIds],
             sidebar: ["skills", "languages", "interests"],
           },
         ],
@@ -379,17 +370,11 @@ export function mapPsupToResumeData(
  * Le CV parse apporte les sections manquantes dans PSUP :
  * experiences, projets, certifications, summary enrichi.
  */
-export function mergeParsedCvIntoResumeData(
-  psupResume: ResumeData,
-  parsedCv: ResumeData,
-): ResumeData {
+export function mergeParsedCvIntoResumeData(psupResume: ResumeData, parsedCv: ResumeData): ResumeData {
   const merged = { ...psupResume };
 
   // Experiences : on prend celles du CV parse si PSUP n'en a pas
-  if (
-    psupResume.sections.experience.items.length === 0 &&
-    parsedCv.sections.experience.items.length > 0
-  ) {
+  if (psupResume.sections.experience.items.length === 0 && parsedCv.sections.experience.items.length > 0) {
     merged.sections = {
       ...merged.sections,
       experience: {
@@ -426,12 +411,8 @@ export function mergeParsedCvIntoResumeData(
 
   // Competences : on complete avec celles du CV parse (pas de doublon)
   if (parsedCv.sections.skills.items.length > 0) {
-    const existingNames = new Set(
-      psupResume.sections.skills.items.map((s) => s.name.toLowerCase()),
-    );
-    const newSkills = parsedCv.sections.skills.items.filter(
-      (s) => !existingNames.has(s.name.toLowerCase()),
-    );
+    const existingNames = new Set(psupResume.sections.skills.items.map((s) => s.name.toLowerCase()));
+    const newSkills = parsedCv.sections.skills.items.filter((s) => !existingNames.has(s.name.toLowerCase()));
 
     if (newSkills.length > 0) {
       merged.sections = {

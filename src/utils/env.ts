@@ -14,8 +14,8 @@ export const env = createEnv({
     APP_URL: z.url({ protocol: /https?/ }),
     PRINTER_APP_URL: z.url({ protocol: /https?/ }).optional(),
 
-    // Printer
-    PRINTER_ENDPOINT: z.url({ protocol: /^(wss?|https?)$/ }),
+    // Printer (optional — @react-pdf/renderer is used by default, no external service needed)
+    PRINTER_ENDPOINT: z.url({ protocol: /^(wss?|https?)$/ }).optional(),
 
     // Database
     DATABASE_URL: z.url({ protocol: /postgres(ql)?/ }),

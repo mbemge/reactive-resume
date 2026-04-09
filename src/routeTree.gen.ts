@@ -13,7 +13,6 @@ import { Route as SchemaDotjsonRouteImport } from "./routes/schema[.]json";
 import { Route as DashboardRouteRouteImport } from "./routes/dashboard/route";
 import { Route as AuthRouteRouteImport } from "./routes/auth/route";
 import { Route as HomeRouteRouteImport } from "./routes/_home/route";
-import { Route as McpIndexRouteImport } from "./routes/mcp/index";
 import { Route as DashboardIndexRouteImport } from "./routes/dashboard/index";
 import { Route as AuthIndexRouteImport } from "./routes/auth/index";
 import { Route as HomeIndexRouteImport } from "./routes/_home/index";
@@ -47,7 +46,6 @@ import { Route as ApiOpenapiSplatRouteImport } from "./routes/api/openapi.$";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth.$";
 import { Route as DotwellKnownOauthProtectedResourceSplatRouteImport } from "./routes/[.]well-known/oauth-protected-resource.$";
 import { Route as DotwellKnownOauthAuthorizationServerSplatRouteImport } from "./routes/[.]well-known/oauth-authorization-server.$";
-import { Route as DotwellKnownMcpServerCardDotjsonRouteImport } from "./routes/[.]well-known/mcp/server-card[.]json";
 import { Route as DashboardSettingsAuthenticationIndexRouteImport } from "./routes/dashboard/settings/authentication/index";
 
 const SchemaDotjsonRoute = SchemaDotjsonRouteImport.update({
@@ -67,11 +65,6 @@ const AuthRouteRoute = AuthRouteRouteImport.update({
 } as any);
 const HomeRouteRoute = HomeRouteRouteImport.update({
   id: "/_home",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const McpIndexRoute = McpIndexRouteImport.update({
-  id: "/mcp/",
-  path: "/mcp/",
   getParentRoute: () => rootRouteImport,
 } as any);
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
@@ -249,12 +242,6 @@ const DotwellKnownOauthAuthorizationServerSplatRoute =
     path: "/$",
     getParentRoute: () => DotwellKnownOauthAuthorizationServerRoute,
   } as any);
-const DotwellKnownMcpServerCardDotjsonRoute =
-  DotwellKnownMcpServerCardDotjsonRouteImport.update({
-    id: "/.well-known/mcp/server-card.json",
-    path: "/.well-known/mcp/server-card.json",
-    getParentRoute: () => rootRouteImport,
-  } as any);
 const DashboardSettingsAuthenticationIndexRoute =
   DashboardSettingsAuthenticationIndexRouteImport.update({
     id: "/settings/authentication/",
@@ -284,8 +271,6 @@ export interface FileRoutesByFullPath {
   "/printer/$resumeId": typeof PrinterResumeIdRoute;
   "/auth/": typeof AuthIndexRoute;
   "/dashboard/": typeof DashboardIndexRoute;
-  "/mcp/": typeof McpIndexRoute;
-  "/.well-known/mcp/server-card.json": typeof DotwellKnownMcpServerCardDotjsonRoute;
   "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
   "/.well-known/oauth-protected-resource/$": typeof DotwellKnownOauthProtectedResourceSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
@@ -322,8 +307,6 @@ export interface FileRoutesByTo {
   "/": typeof HomeIndexRoute;
   "/auth": typeof AuthIndexRoute;
   "/dashboard": typeof DashboardIndexRoute;
-  "/mcp": typeof McpIndexRoute;
-  "/.well-known/mcp/server-card.json": typeof DotwellKnownMcpServerCardDotjsonRoute;
   "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
   "/.well-known/oauth-protected-resource/$": typeof DotwellKnownOauthProtectedResourceSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
@@ -365,8 +348,6 @@ export interface FileRoutesById {
   "/_home/": typeof HomeIndexRoute;
   "/auth/": typeof AuthIndexRoute;
   "/dashboard/": typeof DashboardIndexRoute;
-  "/mcp/": typeof McpIndexRoute;
-  "/.well-known/mcp/server-card.json": typeof DotwellKnownMcpServerCardDotjsonRoute;
   "/.well-known/oauth-authorization-server/$": typeof DotwellKnownOauthAuthorizationServerSplatRoute;
   "/.well-known/oauth-protected-resource/$": typeof DotwellKnownOauthProtectedResourceSplatRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
@@ -408,8 +389,6 @@ export interface FileRouteTypes {
     | "/printer/$resumeId"
     | "/auth/"
     | "/dashboard/"
-    | "/mcp/"
-    | "/.well-known/mcp/server-card.json"
     | "/.well-known/oauth-authorization-server/$"
     | "/.well-known/oauth-protected-resource/$"
     | "/api/auth/$"
@@ -446,8 +425,6 @@ export interface FileRouteTypes {
     | "/"
     | "/auth"
     | "/dashboard"
-    | "/mcp"
-    | "/.well-known/mcp/server-card.json"
     | "/.well-known/oauth-authorization-server/$"
     | "/.well-known/oauth-protected-resource/$"
     | "/api/auth/$"
@@ -488,8 +465,6 @@ export interface FileRouteTypes {
     | "/_home/"
     | "/auth/"
     | "/dashboard/"
-    | "/mcp/"
-    | "/.well-known/mcp/server-card.json"
     | "/.well-known/oauth-authorization-server/$"
     | "/.well-known/oauth-protected-resource/$"
     | "/api/auth/$"
@@ -520,8 +495,6 @@ export interface RootRouteChildren {
   DotwellKnownOpenidConfigurationRoute: typeof DotwellKnownOpenidConfigurationRoute;
   ApiHealthRoute: typeof ApiHealthRoute;
   PrinterResumeIdRoute: typeof PrinterResumeIdRoute;
-  McpIndexRoute: typeof McpIndexRoute;
-  DotwellKnownMcpServerCardDotjsonRoute: typeof DotwellKnownMcpServerCardDotjsonRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
   ApiOpenapiSplatRoute: typeof ApiOpenapiSplatRoute;
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute;
@@ -556,13 +529,6 @@ declare module "@tanstack/react-router" {
       path: "";
       fullPath: "/";
       preLoaderRoute: typeof HomeRouteRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/mcp/": {
-      id: "/mcp/";
-      path: "/mcp";
-      fullPath: "/mcp/";
-      preLoaderRoute: typeof McpIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/dashboard/": {
@@ -796,13 +762,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerSplatRouteImport;
       parentRoute: typeof DotwellKnownOauthAuthorizationServerRoute;
     };
-    "/.well-known/mcp/server-card.json": {
-      id: "/.well-known/mcp/server-card.json";
-      path: "/.well-known/mcp/server-card.json";
-      fullPath: "/.well-known/mcp/server-card.json";
-      preLoaderRoute: typeof DotwellKnownMcpServerCardDotjsonRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/dashboard/settings/authentication/": {
       id: "/dashboard/settings/authentication/";
       path: "/settings/authentication";
@@ -939,8 +898,6 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownOpenidConfigurationRoute: DotwellKnownOpenidConfigurationRoute,
   ApiHealthRoute: ApiHealthRoute,
   PrinterResumeIdRoute: PrinterResumeIdRoute,
-  McpIndexRoute: McpIndexRoute,
-  DotwellKnownMcpServerCardDotjsonRoute: DotwellKnownMcpServerCardDotjsonRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiOpenapiSplatRoute: ApiOpenapiSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,

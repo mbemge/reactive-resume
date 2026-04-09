@@ -13,7 +13,7 @@ import { useResumeStore } from "../store/resume";
 
 const sectionClassName = cn(
   // Section Heading - thin uppercase with subtle left accent
-  "[&>h6]:uppercase [&>h6]:tracking-[0.15em] [&>h6]:text-[0.7em]",
+  "[&>h6]:text-[0.7em] [&>h6]:tracking-[0.15em] [&>h6]:uppercase",
   "[&>h6]:border-l-2 [&>h6]:border-(--page-primary-color) [&>h6]:pl-2",
   "[&>h6]:mb-2",
 
@@ -57,19 +57,12 @@ export function SorbonneTemplate({ pageIndex, pageLayout }: TemplateProps) {
 
       <div className="flex">
         {/* Main content */}
-        <main
-          data-layout="main"
-          className="group page-main z-10 flex-1"
-        >
+        <main data-layout="main" className="group page-main z-10 flex-1">
           {isFirstPage && <Header />}
 
           {isFirstPage && (
             <PageSummary
-              className={cn(
-                sectionClassName,
-                "px-(--page-margin-x) pb-2 pt-(--page-gap-y)",
-                "[&>h6]:hidden",
-              )}
+              className={cn(sectionClassName, "px-(--page-margin-x) pt-(--page-gap-y) pb-2", "[&>h6]:hidden")}
             />
           )}
 
@@ -119,7 +112,7 @@ function Header() {
           </div>
 
           {/* Contact info in a clean horizontal layout */}
-          <div className="basics-items flex flex-wrap gap-x-4 gap-y-1 *:flex *:items-center *:gap-x-1.5 text-[0.85em] opacity-75">
+          <div className="basics-items flex flex-wrap gap-x-4 gap-y-1 text-[0.85em] opacity-75 *:flex *:items-center *:gap-x-1.5">
             {basics.email && (
               <div className="basics-item-email">
                 <EnvelopeIcon />

@@ -1,8 +1,8 @@
 import z from "zod";
 
+import { mapPsupToResumeData, mergeParsedCvIntoResumeData } from "@/integrations/psup/mapper";
 import { psupCandidatSchema, psupVoeuSchema } from "@/integrations/psup/schema";
 import { generateBatchCVs, generateSingleCV } from "@/integrations/psup/service";
-import { mapPsupToResumeData, mergeParsedCvIntoResumeData } from "@/integrations/psup/mapper";
 import { resumeDataSchema } from "@/schema/resume/data";
 import { env } from "@/utils/env";
 
@@ -46,9 +46,7 @@ export const psupRouter = {
     )
     .output(resumeDataSchema)
     .handler(async ({ input }) => {
-      const isPdf =
-        input.file.name.toLowerCase().endsWith(".pdf") ||
-        input.file.type === "application/pdf";
+      const isPdf = input.file.name.toLowerCase().endsWith(".pdf");
 
       if (isPdf) {
         return aiService.parsePdf(input);
@@ -85,10 +83,12 @@ export const psupRouter = {
         voeu: psupVoeuSchema.optional().describe("The specific voeu to tailor the CV for."),
         template: z.string().optional().describe("The template to use (default: onyx)."),
         generatePdf: z.boolean().optional().describe("Whether to generate a PDF immediately."),
-        parsedCvData: resumeDataSchema.optional().describe(
-          "Structured data from a previously parsed CV (from /psup/parse-cv). " +
-          "Experiences, skills, and projects from this will be merged into the generated CV.",
-        ),
+        parsedCvData: resumeDataSchema
+          .optional()
+          .describe(
+            "Structured data from a previously parsed CV (from /psup/parse-cv). " +
+              "Experiences, skills, and projects from this will be merged into the generated CV.",
+          ),
       }),
     )
     .output(generateResultSchema)

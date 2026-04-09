@@ -115,6 +115,7 @@ export const psupCandidatSchema = z.object({
 export type PsupCandidat = z.infer<typeof psupCandidatSchema>;
 export type PsupVoeu = z.infer<typeof psupVoeuSchema>;
 export type PsupFormation = z.infer<typeof psupFormationSchema>;
+export type PsupBulletin = z.infer<typeof psupBulletinSchema>;
 export type PsupExperience = z.infer<typeof psupExperienceSchema>;
 export type PsupLangue = z.infer<typeof psupLangueSchema>;
 export type PsupCompetence = z.infer<typeof psupCompetenceSchema>;

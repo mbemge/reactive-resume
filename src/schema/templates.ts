@@ -8,12 +8,15 @@ export const templateSchema = z.enum([
   "ditto",
   "gengar",
   "glalie",
+  "haussmann",
   "kakuna",
   "lapras",
   "leafish",
+  "marais",
   "onyx",
   "pikachu",
   "rhyhorn",
+  "rivoli",
   "sorbonne",
 ]);
 
@@ -37,4 +40,5 @@ export const printMarginTemplates = [
   "onyx",
   "pikachu",
   "rhyhorn",
+  "rivoli",
 ] satisfies Template[] as string[];

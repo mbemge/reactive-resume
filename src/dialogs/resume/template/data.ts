@@ -62,6 +62,13 @@ export const templates = {
     tags: ["Two-column", "Minimal", "Professional", "Legal", "Finance", "Executive", "Understated"],
     sidebarPosition: "left",
   },
+  haussmann: {
+    name: "Haussmann",
+    description: msg`Two-column with a bold colored sidebar featuring white text; ideal for creative professionals who want their CV to stand out.`,
+    imageUrl: "/templates/jpg/haussmann.jpg",
+    tags: ["Two-column", "Bold", "Creative", "Colored sidebar", "Modern"],
+    sidebarPosition: "right",
+  },
   kakuna: {
     name: "Kakuna",
     description: msg`Single-column with a magenta left border accent; compact and efficient for entry-level or internship applications.`,
@@ -103,5 +110,26 @@ export const templates = {
     imageUrl: "/templates/jpg/rhyhorn.jpg",
     tags: ["Single-column", "ATS friendly", "Minimal", "Clean", "Modern", "Designer", "Content creator", "Whitespace"],
     sidebarPosition: "none",
+  },
+  rivoli: {
+    name: "Rivoli",
+    description: msg`Ultra-modern minimalist single-column layout with wide-spaced uppercase headings and a thin accent line; perfect for tech, design, or academic applications.`,
+    imageUrl: "/templates/jpg/rivoli.jpg",
+    tags: ["Single-column", "ATS friendly", "Ultra-modern", "Minimalist", "Academic", "Tech", "Design"],
+    sidebarPosition: "none",
+  },
+  marais: {
+    name: "Marais",
+    description: msg`Creative two-column with a full-width colored header banner and light gray sidebar; great for marketing, communication, or student applications.`,
+    imageUrl: "/templates/jpg/marais.jpg",
+    tags: ["Two-column", "Creative", "Colored header", "Marketing", "Communication", "Student"],
+    sidebarPosition: "right",
+  },
+  sorbonne: {
+    name: "Sorbonne",
+    description: msg`Elegant two-column with a slim colored sidebar and geometric accents; inspired by French academic style, ideal for Parcoursup and university applications.`,
+    imageUrl: "/templates/jpg/sorbonne.jpg",
+    tags: ["Two-column", "Elegant", "Academic", "Parcoursup", "University", "French style"],
+    sidebarPosition: "right",
   },
 } as const satisfies Record<Template, TemplateMetadata>;

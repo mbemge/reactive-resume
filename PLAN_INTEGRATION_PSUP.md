@@ -2,139 +2,220 @@
 
 ## Vue d'ensemble
 
-Reactive Resume est deploye comme microservice sur Hetzner (Coolify).
-L'app PSUP communique avec lui via API REST pour generer des CVs
-a partir des fiches candidats Parcoursup.
+- **PSUP** : deploye sur Vercel (frontend + API routes)
+- **Reactive Resume** : deploye sur Hetzner via Coolify (microservice CV)
+- Communication : PSUP appelle Reactive Resume via HTTPS + API key
 
 ---
 
 ## Architecture cible
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    APP PSUP                          │
-│                                                      │
-│  Fiche candidat                                      │
-│  ├── Onglet Infos                                    │
-│  ├── Onglet Voeux                                    │
-│  ├── Onglet Bulletins                                │
-│  └── Onglet CV  ◄──── NOUVEAU                       │
-│       ├── Upload CV etudiant (PDF/DOCX)              │
-│       ├── Bouton "Generer CV" (par voeu)             │
-│       ├── Preview PDF inline                         │
-│       ├── Bouton "Modifier" → ouvre l'editeur        │
-│       └── Liste des CVs generes                      │
-│                                                      │
-│  Backend PSUP                                        │
-│  └── Service CvService                               │
-│       ├── parseCv(file) → experiences                │
-│       ├── generateCv(candidat, voeu, experiences)    │
-│       └── listCvs(candidatId)                        │
-└──────────────────┬──────────────────────────────────┘
-                   │ HTTPS (API key ou JWT)
-                   ▼
-┌──────────────────────────────────────────────────────┐
-│            REACTIVE RESUME (Microservice)             │
-│            https://cv.votredomaine.com                │
-│                                                      │
-│  API Endpoints utilises :                             │
-│  ├── POST /api/rpc/psup/parse-cv                     │
-│  ├── POST /api/rpc/psup/generate                     │
-│  ├── POST /api/rpc/psup/generate-batch               │
-│  ├── POST /api/rpc/psup/preview                      │
-│  ├── GET  /api/rpc/resumes/{id}/pdf                  │
-│  └── Editeur : /builder/{resumeId}                   │
-│                                                      │
-│  Infrastructure :                                     │
-│  ├── PostgreSQL (stockage CVs)                       │
-│  ├── Browserless (generation PDF)                    │
-│  └── SeaweedFS (stockage fichiers PDF)               │
-└──────────────────────────────────────────────────────┘
+┌─ VERCEL ─────────────────────────────────────────────┐
+│                    APP PSUP                           │
+│                                                       │
+│  Frontend (React/Next.js)                             │
+│  ├── Fiche candidat                                   │
+│  │   ├── Onglet Infos                                 │
+│  │   ├── Onglet Voeux                                 │
+│  │   ├── Onglet Bulletins                             │
+│  │   └── Onglet CV  ◄──── NOUVEAU                    │
+│  │        ├── Upload CV etudiant (PDF/DOCX)           │
+│  │        ├── Bouton "Generer CV" (par voeu)          │
+│  │        ├── Preview PDF inline                      │
+│  │        ├── Bouton "Modifier" → editeur RR          │
+│  │        └── Liste des CVs generes                   │
+│  │                                                    │
+│  API Routes Vercel (/api/cv/*)                        │
+│  └── Proxy vers Reactive Resume                       │
+│       ├── POST /api/cv/parse     → RR /psup/parse-cv │
+│       ├── POST /api/cv/generate  → RR /psup/generate │
+│       └── POST /api/cv/batch     → RR /psup/batch    │
+└──────────────────┬────────────────────────────────────┘
+                   │ HTTPS + x-api-key header
+                   │
+┌─ HETZNER/COOLIFY ┼──────────────────────────────────────┐
+│                   ▼                                      │
+│  REACTIVE RESUME (Docker Compose)                        │
+│  https://cv.votredomaine.com                             │
+│                                                          │
+│  API :                                                   │
+│  ├── POST /api/rpc/psup/parse-cv                         │
+│  ├── POST /api/rpc/psup/generate   → cree CV + PDF      │
+│  ├── POST /api/rpc/psup/generate-batch                   │
+│  ├── POST /api/rpc/psup/preview                          │
+│  ├── GET  /api/rpc/resumes/{id}/pdf                      │
+│  └── Editeur drag & drop : /builder/{resumeId}           │
+│                                                          │
+│  Services Docker :                                       │
+│  ├── app (Node.js, port 3000)                            │
+│  ├── postgres (PostgreSQL 16)                            │
+│  ├── browserless (Chrome headless, generation PDF)       │
+│  └── seaweedfs (stockage S3 local)                       │
+└──────────────────────────────────────────────────────────┘
 ```
+
+**Pourquoi un proxy dans PSUP ?**
+- L'API key Reactive Resume reste cote serveur (jamais exposee au client)
+- Le frontend PSUP appelle `/api/cv/*` (meme domaine, pas de CORS)
+- Le proxy Vercel forward vers Hetzner avec le header `x-api-key`
 
 ---
 
-## Phases de developpement
+## Phase 1 — Deploy Reactive Resume sur Hetzner (1-2 jours)
 
-### Phase 1 — Infrastructure (1-2 jours)
+**Objectif** : Microservice CV operationnel
 
-**Objectif** : Deployer Reactive Resume sur Coolify
-
-**Taches** :
-
-- [ ] Deployer via Coolify avec `compose.coolify.yml`
+- [ ] Dans Coolify > Add Resource > Docker Compose
   - Source : GitHub `mbemge/reactive-resume`
   - Branche : `claude/analyze-cv-generator-FR3xe`
   - Compose file : `compose.coolify.yml`
-- [ ] Configurer les variables d'environnement dans Coolify :
-  - `APP_URL` = `https://cv.votredomaine.com`
-  - `AUTH_SECRET` = generer avec `openssl rand -hex 32`
-  - `POSTGRES_PASSWORD` = mot de passe fort
-- [ ] Configurer le domaine + SSL dans Coolify
-- [ ] Creer un compte utilisateur (email/mot de passe)
-- [ ] Generer une API key dans Reactive Resume (Settings > API Keys)
-- [ ] Tester : `curl https://cv.votredomaine.com/api/health`
-- [ ] Tester la generation PDF : creer un CV manuellement, exporter
+- [ ] Variables d'environnement Coolify :
 
-**Validation** : L'URL repond, on peut creer un CV et exporter un PDF.
+  | Variable | Valeur |
+  |----------|--------|
+  | `APP_URL` | `https://cv.votredomaine.com` |
+  | `AUTH_SECRET` | `openssl rand -hex 32` |
+  | `POSTGRES_PASSWORD` | mot de passe fort |
+
+- [ ] Domaine + SSL (Coolify gere Let's Encrypt)
+- [ ] Deploy, attendre ~5 min
+- [ ] Tester :
+  ```bash
+  curl https://cv.votredomaine.com/api/health
+  ```
+- [ ] Creer un compte sur l'interface web
+- [ ] Generer une API key (Settings > API Keys)
+- [ ] Tester un CV manuellement + export PDF
+
+**Validation** : `curl -H "x-api-key: rxr_xxx" https://cv.votredomaine.com/api/health` → 200
 
 ---
 
-### Phase 2 — Service backend PSUP (3-5 jours)
+## Phase 2 — API Routes dans PSUP / Vercel (2-3 jours)
 
-**Objectif** : Creer le service cote PSUP qui communique avec Reactive Resume
+**Objectif** : PSUP peut appeler Reactive Resume
 
-**2.1 — Configuration**
-
-- [ ] Ajouter les variables d'environnement dans PSUP :
-  ```
-  REACTIVE_RESUME_URL=https://cv.votredomaine.com
-  REACTIVE_RESUME_API_KEY=rxr_xxxxxxxxxx
-  ```
-- [ ] Creer un provider IA pour le parsing de CV :
-  ```
-  AI_PROVIDER=anthropic  (ou openai, gemini)
-  AI_MODEL=claude-sonnet-4-20250514
-  AI_API_KEY=sk-ant-xxxxxxxxxx
-  ```
-
-**2.2 — Service CvService (dans le backend PSUP)**
+### 2.1 — Variables d'environnement Vercel
 
 ```
-CvService
-├── parseCv(file: File) → ParsedCvData
-│   Appelle POST /api/rpc/psup/parse-cv
-│   Envoie le fichier en base64 + credentials IA
-│   Retourne les experiences/competences extraites
-│
-├── generateCv(candidatId, voeuId, parsedCvData?) → GenerateResult
-│   1. Recupere les donnees PSUP du candidat (identite, formations,
-│      bulletins, langues, competences, activites, voeu)
-│   2. Mappe vers le format PsupCandidat + PsupVoeu
-│   3. Appelle POST /api/rpc/psup/generate
-│   4. Stocke le resumeId dans la table candidat_cvs de PSUP
-│   5. Retourne { resumeId, editorUrl, pdfUrl }
-│
-├── previewCv(candidatId, voeuId) → ResumeData
-│   Appelle POST /api/rpc/psup/preview
-│   Retourne le JSON sans sauvegarder (pour apercu)
-│
-├── getPdf(resumeId) → string (URL)
-│   Appelle GET /api/rpc/resumes/{resumeId}/pdf
-│   Retourne l'URL du PDF
-│
-├── listCvs(candidatId) → CandidatCv[]
-│   Requete sur la table candidat_cvs de PSUP
-│   Retourne la liste des CVs generes pour ce candidat
-│
-└── deleteCv(resumeId) → void
-    Supprime le CV de Reactive Resume + de la table locale
+REACTIVE_RESUME_URL=https://cv.votredomaine.com
+REACTIVE_RESUME_API_KEY=rxr_xxxxxxxxxx
+AI_PROVIDER=anthropic
+AI_MODEL=claude-sonnet-4-20250514
+AI_API_KEY=sk-ant-xxxxxxxxxx
 ```
 
-**2.3 — Mapping des donnees PSUP → PsupCandidat**
+### 2.2 — Client HTTP (dans PSUP)
 
-Le format attendu par l'API est documente dans le schema Zod.
-Voici le mapping depuis les tables PSUP typiques :
+```typescript
+// lib/reactive-resume.ts
+
+const RR_URL = process.env.REACTIVE_RESUME_URL;
+const RR_KEY = process.env.REACTIVE_RESUME_API_KEY;
+
+async function rrFetch(path: string, body: unknown) {
+  const res = await fetch(`${RR_URL}/api/rpc${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": RR_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) throw new Error(`RR API error: ${res.status}`);
+  return res.json();
+}
+
+export async function parseCv(file: {
+  name: string;
+  data: string; // base64
+  type: string;
+}) {
+  return rrFetch("/psup/parse-cv", {
+    provider: process.env.AI_PROVIDER,
+    model: process.env.AI_MODEL,
+    apiKey: process.env.AI_API_KEY,
+    baseURL: "",
+    file,
+  });
+}
+
+export async function generateCv(input: {
+  candidat: PsupCandidat;
+  voeu?: PsupVoeu;
+  template?: string;
+  generatePdf?: boolean;
+  parsedCvData?: ResumeData;
+}) {
+  return rrFetch("/psup/generate", input);
+}
+
+export async function generateBatch(input: {
+  candidats: Array<{ candidat: PsupCandidat; voeu?: PsupVoeu }>;
+  template?: string;
+  generatePdf?: boolean;
+}) {
+  return rrFetch("/psup/generate-batch", input);
+}
+
+export async function previewCv(input: {
+  candidat: PsupCandidat;
+  voeu?: PsupVoeu;
+  parsedCvData?: ResumeData;
+}) {
+  return rrFetch("/psup/preview", input);
+}
+```
+
+### 2.3 — API Routes Vercel (proxy)
+
+```typescript
+// app/api/cv/parse/route.ts (Next.js App Router)
+import { parseCv } from "@/lib/reactive-resume";
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const result = await parseCv(body.file);
+  return Response.json(result);
+}
+```
+
+```typescript
+// app/api/cv/generate/route.ts
+import { generateCv } from "@/lib/reactive-resume";
+
+export async function POST(req: Request) {
+  const body = await req.json();
+
+  // Recuperer les donnees PSUP du candidat depuis votre BDD
+  const candidat = await getCandidatPsupData(body.candidatId);
+  const voeu = body.voeuId ? await getVoeuData(body.voeuId) : undefined;
+
+  const result = await generateCv({
+    candidat,
+    voeu,
+    template: body.template ?? "sorbonne",
+    generatePdf: body.generatePdf ?? true,
+    parsedCvData: body.parsedCvData,
+  });
+
+  // Sauvegarder la reference dans la BDD PSUP
+  await saveCandidatCv({
+    candidatId: body.candidatId,
+    voeuId: body.voeuId,
+    resumeId: result.resumeId,
+    nom: result.candidatNom,
+    pdfUrl: result.pdfUrl,
+    editorUrl: result.editorUrl,
+  });
+
+  return Response.json(result);
+}
+```
+
+### 2.4 — Mapping donnees PSUP → format API
 
 ```
 Table PSUP               →  Champ PsupCandidat
@@ -164,27 +245,32 @@ voeu                      →  voeu {
                              }
 
 activite_extrascolaire[]  →  activitesExtraScolaires[] {
-                               categorie, titre, description,
-                               duree, niveau
+                               categorie (sport|art|association|
+                                          engagement|autre),
+                               titre, description, duree, niveau
                              }
 
-langue[]                  →  langues[] { langue, niveau, certifications }
+langue[]                  →  langues[] {
+                               langue, niveau (A1|A2|B1|B2|C1|C2|natif),
+                               certifications[]
+                             }
 
 competence[]              →  competences[] { categorie, items[] }
 ```
 
-**2.4 — Table a ajouter dans PSUP**
+### 2.5 — Table a ajouter dans la BDD PSUP
 
 ```sql
 CREATE TABLE candidat_cvs (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   candidat_id   UUID NOT NULL REFERENCES candidats(id),
   voeu_id       UUID REFERENCES voeux(id),
-  resume_id     VARCHAR(255) NOT NULL,  -- ID dans Reactive Resume
+  resume_id     VARCHAR(255) NOT NULL,
   nom           VARCHAR(500),
   template      VARCHAR(50) DEFAULT 'sorbonne',
   pdf_url       TEXT,
   editor_url    TEXT,
+  parsed_cv     JSONB,  -- donnees parsees du CV upload (cache)
   created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
@@ -192,139 +278,137 @@ CREATE TABLE candidat_cvs (
 CREATE INDEX idx_candidat_cvs_candidat ON candidat_cvs(candidat_id);
 ```
 
-**Validation** : Depuis le backend PSUP, on peut generer un CV et recuperer le PDF.
+**Validation** : `POST /api/cv/generate { candidatId, voeuId }` → retourne un PDF
 
 ---
 
-### Phase 3 — Frontend PSUP : Onglet CV (3-5 jours)
+## Phase 3 — Onglet CV dans le frontend PSUP (3-5 jours)
 
-**Objectif** : Ajouter l'onglet CV dans la fiche candidat
+**Objectif** : Interface utilisateur dans la fiche candidat
 
-**3.1 — Composant OngletCV**
+### 3.1 — Composant OngletCV
 
 ```
 OngletCV
-├── Section "CV source" (en haut)
-│   ├── Zone de drop / bouton upload pour le CV de l'etudiant
-│   ├── Indicateur : "CV parse : 3 experiences, 5 competences extraites"
-│   └── Bouton "Re-parser" si le CV a change
+├── Zone upload (haut)
+│   ├── Dropzone "Deposer le CV de l'etudiant (PDF/DOCX)"
+│   ├── Badge : "3 experiences, 5 competences extraites"
+│   └── Bouton "Re-parser"
 │
-├── Section "Generer un CV" (milieu)
-│   ├── Selecteur de voeu (dropdown des voeux du candidat)
-│   ├── Selecteur de template (sorbonne, onyx, gengar, chikorita)
-│   ├── Bouton "Apercu" → affiche un preview sans sauvegarder
-│   ├── Bouton "Generer le CV" → cree + genere PDF
-│   └── Checkbox "Generer pour tous les voeux"
+├── Generateur (milieu)
+│   ├── Select voeu (dropdown des voeux du candidat)
+│   ├── Select template (sorbonne, onyx, gengar, chikorita)
+│   ├── [Apercu]  [Generer le CV]  [Generer pour tous les voeux]
+│   └── Preview PDF inline (iframe ou react-pdf)
 │
-└── Section "CVs generes" (en bas)
-    ├── Liste des CVs deja generes
-    │   ├── Nom du CV (ex: "CV Marie Dupont - Licence Maths")
-    │   ├── Voeu associe
-    │   ├── Date de generation
-    │   ├── Bouton "Voir PDF" → ouvre le PDF
-    │   ├── Bouton "Modifier" → ouvre l'editeur Reactive Resume
-    │   └── Bouton "Regenerer" → ecrase et regenere
-    └── Bouton "Telecharger tous les PDFs" (zip)
+└── CVs generes (bas)
+    └── Table
+        | Nom du CV                         | Voeu          | Date       |            |
+        | CV Marie Dupont - Licence Maths   | Licence Maths | 09/04/2026 | PDF Editer |
+        | CV Marie Dupont - CPGE MPSI       | CPGE MPSI     | 09/04/2026 | PDF Editer |
 ```
 
-**3.2 — Appels API depuis le frontend PSUP**
+### 3.2 — Appels frontend
 
-```javascript
-// 1. Upload et parse du CV de l'etudiant
-const parsedData = await cvService.parseCv(file);
-// Stocker parsedData dans le state du composant
+```typescript
+// Upload et parse
+const onUpload = async (file: File) => {
+  setLoading(true);
+  const base64 = await fileToBase64(file);
+  const parsed = await fetch("/api/cv/parse", {
+    method: "POST",
+    body: JSON.stringify({
+      file: { name: file.name, data: base64, type: file.type }
+    }),
+  }).then(r => r.json());
+  setParsedCv(parsed);
+  setLoading(false);
+};
 
-// 2. Generer un CV pour un voeu
-const result = await cvService.generateCv(
-  candidatId,
-  voeuId,
-  parsedData  // optionnel, si un CV a ete uploade
-);
-// result = { resumeId, editorUrl, pdfUrl }
+// Generer CV
+const onGenerate = async (voeuId: string) => {
+  setGenerating(true);
+  const result = await fetch("/api/cv/generate", {
+    method: "POST",
+    body: JSON.stringify({
+      candidatId,
+      voeuId,
+      template: selectedTemplate,
+      generatePdf: true,
+      parsedCvData: parsedCv,
+    }),
+  }).then(r => r.json());
+  // result = { resumeId, editorUrl, pdfUrl }
+  setCvList(prev => [...prev, result]);
+  setGenerating(false);
+};
 
-// 3. Ouvrir l'editeur pour retouches
-window.open(result.editorUrl, '_blank');
-// Ou dans un iframe :
-<iframe src={result.editorUrl} />
-
-// 4. Voir le PDF
-<iframe src={result.pdfUrl} type="application/pdf" />
+// Ouvrir editeur
+const onEdit = (editorUrl: string) => {
+  window.open(editorUrl, "_blank");
+};
 ```
 
-**3.3 — UX a respecter**
+### 3.3 — Timings et UX
 
-- Le parsing du CV prend ~10-15s → afficher un loader avec message
-- La generation du PDF prend ~5-10s → afficher une barre de progression
-- Quand l'editeur s'ouvre, le conseiller doit etre deja authentifie
-  (passer le token via query param ou pre-authentifier via cookie)
-- Les CVs generes restent accessibles tant qu'ils ne sont pas supprimes
+| Action | Duree | UX |
+|--------|-------|----|
+| Parse CV (IA) | 10-20s | Spinner + "Analyse du CV en cours..." |
+| Generer CV (sans PDF) | 1-2s | Instantane |
+| Generer CV (avec PDF) | 5-15s | Barre de progression |
+| Ouvrir editeur | instantane | Nouvel onglet |
+| Batch 10 CVs + PDF | 30-60s | Progress "3/10 generes..." |
 
-**Validation** : Le conseiller peut uploader un CV, generer un CV adapte
-au voeu, le voir en PDF, et l'ouvrir dans l'editeur pour retouches.
+**Validation** : Flow complet upload → generer → voir PDF → editer fonctionne
 
 ---
 
-### Phase 4 — Ameliorations (2-3 jours)
+## Phase 4 — Ameliorations (2-3 jours)
 
-**Objectif** : Polir l'experience et ajouter l'adaptation IA par voeu
-
-- [ ] Brancher le prompt de tailoring Parcoursup
-  (`tailor-parcoursup-system.md`) sur un endpoint dedie
-  pour ameliorer automatiquement le contenu du CV par rapport
-  aux attendus du voeu
-- [ ] Ajouter la generation batch :
-  un bouton "Generer les CVs pour tous les voeux" qui appelle
-  `POST /psup/generate-batch`
-- [ ] Nettoyer Reactive Resume :
-  - Virer le job search, la PWA, les locales inutiles
-  - Simplifier l'auth (garder email/mdp uniquement)
-  - Reduire les templates (4-5 modernes)
-- [ ] Personnaliser la landing page de Reactive Resume
-  pour afficher le logo PSUP au lieu du branding Reactive Resume
+- [ ] Tailoring IA : brancher le prompt `tailor-parcoursup-system.md`
+  pour adapter automatiquement le contenu aux attendus du voeu
+- [ ] Bouton "Generer pour tous les voeux" → appel batch
+- [ ] Cache du parsing : stocker `parsed_cv` en base PSUP
+  pour ne pas re-parser a chaque generation
+- [ ] Nettoyage Reactive Resume :
+  virer job search, PWA, locales inutiles, reduire templates
+- [ ] Branding : remplacer le logo Reactive Resume par le logo PSUP
+- [ ] Auth transparente : SSO ou token pre-genere pour que
+  le conseiller accede a l'editeur sans se reconnecter
 
 ---
 
-### Phase 5 — Production (1-2 jours)
+## Phase 5 — Production (1-2 jours)
 
-- [ ] Tests de charge : generer 50 CVs en batch, verifier que
-  Browserless tient (ajuster CONCURRENT si besoin)
-- [ ] Backup PostgreSQL automatise (cron dans Coolify)
-- [ ] Monitoring : alertes si le healthcheck echoue
-- [ ] Documentation : guide utilisateur pour les conseillers
-  (comment uploader, generer, modifier un CV)
-- [ ] RGPD : verifier la conformite (donnees personnelles
-  des candidats stockees dans Reactive Resume)
+- [ ] Tests de charge (50 CVs batch)
+- [ ] Backup PostgreSQL (cron Coolify)
+- [ ] Monitoring / alertes healthcheck
+- [ ] Documentation conseillers
+- [ ] Conformite RGPD (donnees candidats sur serveur externe)
 
 ---
 
-## Estimation globale
+## Estimation
 
-| Phase | Duree estimee | Prerequis |
-|-------|--------------|-----------|
-| Phase 1 — Infrastructure | 1-2 jours | Serveur Hetzner + Coolify |
-| Phase 2 — Backend PSUP | 3-5 jours | Phase 1 terminee |
-| Phase 3 — Frontend PSUP | 3-5 jours | Phase 2 terminee |
-| Phase 4 — Ameliorations | 2-3 jours | Phase 3 terminee |
-| Phase 5 — Production | 1-2 jours | Phase 4 terminee |
-| **Total** | **10-17 jours** | |
+| Phase | Duree | Ou |
+|-------|-------|----|
+| 1. Deploy Reactive Resume | 1-2j | Hetzner/Coolify |
+| 2. API routes PSUP | 2-3j | Vercel (PSUP) |
+| 3. Frontend onglet CV | 3-5j | Vercel (PSUP) |
+| 4. Ameliorations | 2-3j | Les deux |
+| 5. Production | 1-2j | Les deux |
+| **Total** | **9-15 jours** | |
 
 ---
 
-## Endpoints API — Resume
+## Reference API
 
-| Methode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/api/rpc/psup/parse-cv` | Parse un CV (PDF/DOCX) via IA |
-| POST | `/api/rpc/psup/preview` | Apercu sans sauvegarde |
-| POST | `/api/rpc/psup/generate` | Genere un CV + retourne editorUrl |
-| POST | `/api/rpc/psup/generate-batch` | Genere N CVs (max 100) |
-| GET | `/api/rpc/resumes/{id}/pdf` | Exporte un CV en PDF |
+| Methode | Endpoint (Reactive Resume) | Description |
+|---------|----------------------------|-------------|
+| POST | `/api/rpc/psup/parse-cv` | Parse CV (PDF/DOCX) via IA |
+| POST | `/api/rpc/psup/preview` | Apercu JSON sans sauvegarde |
+| POST | `/api/rpc/psup/generate` | Cree CV + retourne editorUrl + pdfUrl |
+| POST | `/api/rpc/psup/generate-batch` | Batch generation (max 100) |
+| GET | `/api/rpc/resumes/{id}/pdf` | Telecharge le PDF |
 
-## Authentification
-
-Toutes les requetes vers Reactive Resume doivent inclure le header :
-```
-x-api-key: rxr_votre_api_key
-```
-
-L'API key se genere dans Reactive Resume > Settings > API Keys.
+**Auth** : header `x-api-key: rxr_votre_api_key` sur toutes les requetes.
